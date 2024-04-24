@@ -8,11 +8,13 @@ sentry_s3_nodestore.backend
 
 from __future__ import absolute_import
 
-import json
+import zlib
+from base64 import urlsafe_b64encode
 from time import sleep
+from uuid import uuid4
 
-import boto
-
+import boto3
+from botocore.config import Config
 from sentry.nodestore.base import NodeStorage
 
 
@@ -26,38 +28,24 @@ def retry(attempts, func, *args, **kwargs):
     raise
 
 
-def connect_s3(bucket_name, region=None, validate=False,
-               aws_access_key_id=None, aws_secret_access_key=None):
-    if region is None:
-        conn = boto.connect_s3(aws_access_key_id=aws_access_key_id,
-                               aws_secret_access_key=aws_secret_access_key)
-    else:
-        conn = boto.s3.connect_to_region(region,
-                                         aws_access_key_id=aws_access_key_id,
-                                         aws_secret_access_key=aws_secret_access_key)
-    return conn.get_bucket(bucket_name, validate=validate)
-
-
 class S3NodeStorage(NodeStorage):
 
-    def __init__(self, bucket_name=None, region=None, max_retries=3,
-                 aws_access_key_id=None, aws_secret_access_key=None):
+    def __init__(self, bucket_name=None, host=None, aws_access_key_id=None, aws_secret_access_key=None, max_retries=3):
         self.max_retries = max_retries
-        self.bucket = connect_s3(bucket_name, region=region,
-                                 aws_access_key_id=aws_access_key_id,
-                                 aws_secret_access_key=aws_secret_access_key)
-
-    def _put(self, node_id, data):
-        key = boto.s3.key.Key(self.bucket)
-        key.key = node_id
-        retry(self.max_retries, key.set_contents_from_string, *(data,))
-        return node_id
+        self.bucket_name = bucket_name
+        self.client = boto3.client(
+            's3',
+            endpoint_url=host,
+            aws_access_key_id=aws_access_key_id,
+            aws_secret_access_key=aws_secret_access_key,
+            config=Config(signature_version='s3v4')
+        )
 
     def delete(self, id):
         """
         >>> nodestore.delete('key1')
         """
-        self.bucket.delete_key(id)
+        self.client.delete_object(Bucket=self.bucket_name, Key=id)
 
     def delete_multi(self, id_list):
         """
@@ -68,53 +56,24 @@ class S3NodeStorage(NodeStorage):
 
         >>> delete_multi(['key1', 'key2'])
         """
-        self.bucket.delete_keys(id_list)
+        self.client.delete_objects(Bucket=self.bucket_name, Delete={
+            'Objects': [{'Key': id} for id in id_list]
+        })
 
-    def get(self, id):
+    def _get_bytes(self, id):
         """
-        >>> data = nodestore.get('key1')
-        >>> print data
+        >>> nodestore._get_bytes('key1')
+        b'{"message": "hello world"}'
         """
-        key = self.bucket.get_key(id)
-        if key is None:
-            return None
-        result = retry(self.max_retries, key.get_contents_as_string)
-        return json.loads(result)
+        print("nodestore key: ", id);
+        result = retry(self.max_retries, self.client.get_object, Bucket=self.bucket_name, Key=id)
+        return zlib.decompress(result['Body'].read())
 
-    def get_multi(self, id_list):
+    def _set_bytes(self, id, data, ttl=None):
         """
-        >>> data_map = nodestore.get_multi(['key1', 'key2')
-        >>> print 'key1', data_map['key1']
-        >>> print 'key2', data_map['key2']
+        >>> nodestore.set('key1', b"{'foo': 'bar'}")
         """
-        return dict(
-            (id, self.get(id))
-            for id in id_list
-        )
+        retry(self.max_retries, self.client.put_object, Body=zlib.compress(data), Bucket=self.bucket_name, Key=id)
 
-    def create(self, data):
-        """
-        >>> nodestore.create({'foo': 'bar'})
-        """
-        node_id = self.generate_id()
-        self._put(node_id, json.dumps(data))
-        return node_id
-
-    def set(self, id, data):
-        """
-        >>> nodestore.set('key1', {'foo': 'bar'})
-        """
-        self._put(id, json.dumps(data))
-
-    def set_multi(self, values):
-        """
-        >>> nodestore.set_multi({
-        >>>     'key1': {'foo': 'bar'},
-        >>>     'key2': {'foo': 'baz'},
-        >>> })
-        """
-        for id, data in values.iteritems():
-            self.set(id=id, data=data)
-
-    def cleanup(self, cutoff_timestamp):
-        raise NotImplementedError
+    def generate_id(self):
+        return urlsafe_b64encode(uuid4().bytes)
