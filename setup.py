@@ -7,7 +7,7 @@ An extension for Sentry which implements an S3 NodeStorage backend
 from setuptools import setup
 
 install_requires = [
-    'boto>=2.38.0',
+    'boto3>=1.34.0',
     'sentry>=7.4.0',
 ]
 
@@ -17,7 +17,7 @@ tests_requires = [
 
 setup(
     name='sentry-s3-nodestore',
-    version='1.0.0',
+    version='1.0.6',
     author='Ernest W. Durbin III',
     author_email='ewdurbin@gmail.com',
     url='http://github.com/ewdurbin/sentry-s3-nodestore',
