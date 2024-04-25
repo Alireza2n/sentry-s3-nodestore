@@ -69,7 +69,7 @@ class S3NodeStorage(NodeStorage):
         result = retry(self.max_retries, self.client.get_object, Bucket=self.bucket_name, Key=id)
         return zlib.decompress(result['Body'].read())
 
-    def _set_bytes(self, id, data, ttl=None):
+    def _set_bytes(self, id, data):
         """
         >>> nodestore.set('key1', b"{'foo': 'bar'}")
         """

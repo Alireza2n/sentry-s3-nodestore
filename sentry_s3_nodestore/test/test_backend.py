@@ -1,7 +1,7 @@
 import unittest
 
-import boto
-from moto import mock_s3
+import boto3
+from moto3 import mock_s3
 
 from sentry_s3_nodestore.backend import S3NodeStorage
 
