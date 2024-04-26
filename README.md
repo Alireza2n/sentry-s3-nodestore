@@ -30,5 +30,5 @@ The bucket should already exist and be accessible by access key, this extension 
 
 # Credits
 
-- Original author Ernest W. Durbin III
-- Upgrade to Boto3 by
+- Original author [Ernest W. Durbin III](https://github.com/ewdurbin)
+- Upgrade to Boto3 by [Letnab](https://github.com/letnab)
