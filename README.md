@@ -4,13 +4,8 @@ sentry-s3-nodestorage
 [Sentry](https://github.com/getsentry/sentry) extension implementing the
 NodeStorage interface for [Amazon Simple Storage Service](https://aws.amazon.com/s3/) and S3-compatible object storages
 such as
-[Minio](https://mi.io).
+[Minio](https://min.io).
 
-# Installation
-
-```bash
-$ pip install sentry-s3-nodestore
-```
 
 # Sentry Configuration
 
